@@ -1,7 +1,8 @@
 import os
+from google.genai import types
 
 def get_file_contents(working_directory, file_path):
-    wd = os.path.join(os.getcwd(), working_directory)  # Get the cwd and working directory
+    wd = os.path.abspath(os.path.join(os.getcwd(), working_directory))  # Get the cwd and working directory
     file_to_access = os.path.abspath(os.path.join(wd, file_path))  # Get the directory to access in working_directory
 
     if not os.path.exists(file_to_access):  # If the supplied file path isn't in the WD
@@ -22,3 +23,17 @@ def get_file_contents(working_directory, file_path):
     except:
         return f'Error: An error occurred'
     
+
+schema_get_file_content = types.FunctionDeclaration(
+    name="get_file_contents",
+    description="Get the contents of a file (maximum 10000 characters) in the specified file path, constrained to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The file path that leads to the specific file that content will be read from, relative to the working directory."
+            )
+        }
+    )
+)

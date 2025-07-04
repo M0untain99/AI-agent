@@ -2,7 +2,7 @@ import os
 from google.genai import types
 
 def get_files_info(working_directory, directory=None):
-    wd = os.path.join(os.getcwd(), working_directory)  # Get the cwd and working directory
+    wd = os.path.abspath(os.path.join(os.getcwd(), working_directory))  # Get the cwd and working directory
     dir_to_access = os.path.abspath(os.path.join(wd, directory))  # Get the directory to access in working_directory
 
     # If the supplied directory is just the WD itself
@@ -30,7 +30,7 @@ def get_files_info(working_directory, directory=None):
     except Error as e:
         return f'ERROR: {e}'
 
-# Create a schema to explain how the functions are used
+# Create a schema to explain how the get_files_info is used
 schema_get_files_info = types.FunctionDeclaration(
     name="get_files_info",
     description="Lists files in the specified directory along with their sizes, constrained to the working directory.",

@@ -1,8 +1,9 @@
 import os
 import subprocess
+from google.genai import types
 
 def run_python_file(working_directory, file_path):
-    wd = os.path.join(os.getcwd(), working_directory)  # Get the cwd and working directory
+    wd = os.path.abspath(os.path.join(os.getcwd(), working_directory))  # Get the cwd and working directory
     file_to_access = os.path.abspath(os.path.join(wd, file_path))  # Get the directory to access in working_directory
 
     if not file_to_access.startswith(wd):  # If the supplied file path isn't in the WD
@@ -27,3 +28,18 @@ def run_python_file(working_directory, file_path):
             return 'No output produced'
     except Exception as e:
         return f'Error: executing Python file: {e}'
+
+# Create a schema to explain how run_python_file is used
+schema_run_python_file = types.FunctionDeclaration(
+    name="run_python_file",
+    description="Run the python file from file_path and get the output, constrained to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The file path that leads to python file that will be executed, relative to the working directory.",
+            ),
+        },
+    ),
+)
