@@ -1,7 +1,7 @@
 import os
 from google.genai import types
 
-def get_files_info(working_directory, directory=None):
+def get_files_info(working_directory, directory='.'):
     wd = os.path.abspath(os.path.join(os.getcwd(), working_directory))  # Get the cwd and working directory
     dir_to_access = os.path.abspath(os.path.join(wd, directory))  # Get the directory to access in working_directory
 

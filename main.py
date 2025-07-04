@@ -10,15 +10,18 @@ from functions.write_file import schema_write_file, write_file
 
 
 def call_function(function_call_part, verbose=False):
-    
+    '''
+    Runs the functions the LLM wants to execute
+    '''
     if verbose:
         print(f"Calling function: {function_call_part.name}({function_call_part.args})")
     else:
         print(f" - Calling function: {function_call_part.name}")
 
-    arguments = function_call_part.args
-    arguments['working_directory'] = './calculator'
+    arguments = function_call_part.args  # Get the arguments it wants to pass to the function
+    arguments['working_directory'] = './calculator'  # Add the WD as the LLM is not permitted to set this
 
+    # For each function available to the LLM execute the function with arguments for it
     if function_call_part.name == "get_files_info":
         result = get_files_info(**arguments)
     elif function_call_part.name == "get_file_contents":
@@ -27,7 +30,7 @@ def call_function(function_call_part, verbose=False):
         result = run_python_file(**arguments)
     elif function_call_part.name == "write_file":
         result = write_file(**arguments)
-    else:
+    else:  # If the LLM tried to call a non-existent function let it know the error
         return types.Content(
             role="tool",
             parts=[
@@ -37,13 +40,13 @@ def call_function(function_call_part, verbose=False):
                     )
                 ],
             )
-
+    # Return the results of running the function to the LLM
     return types.Content(
         role="tool",
         parts=[
             types.Part.from_function_response(
-                name=function_call_part.name,
-                response={"result": result},
+                name=function_call_part.name,  # Name of the function executed
+                response={"result": result},  # Results of running the function
             )
         ],
     )
@@ -83,34 +86,45 @@ if len(sys.argv) < 2:
     print('ERROR: No prompt provided')
     sys.exit(1)
 
-user_prompt = sys.argv[1]
+user_prompt = sys.argv[1]  # Get the first argument provided by the user
 
 # Store the user prompt in the messages list
 messages = [types.Content(role="user", parts=[types.Part(text=user_prompt)]),]
 
-# Get a response to the contents prompt from the specified AI model
-response = client.models.generate_content(
-    model='gemini-2.0-flash-001',
-    contents=messages,
-    config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt))  # Passes a config to the agent
 
-# If a value is provided after the prompt
-if len(sys.argv) > 2:
-    if sys.argv[2] == "--verbose":  # If it's the verbose flag
-        print(f'User prompt: {user_prompt}')
-        print(f'Prompt tokens: {response.usage_metadata.prompt_token_count}')
-        print(f'Response tokens: {response.usage_metadata.candidates_token_count}')
-else:  # If there is just the prompt
-    print(response.text)  # Print the text output
-    
+# Run max 20 prompts to avoid exceeding the free limits
+for i in range(0,20):
+    # Get a response to the prompt from the specified AI model
+    response = client.models.generate_content(
+        model='gemini-2.0-flash-001',
+        contents=messages,
+        config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt))  # Passes a config to the agent
 
-if response.function_calls:  # If the LLM wants to make any function calls
-    print(f"Calling function: {response.function_calls[0].name}({response.function_calls[0].args})")
-    result = call_function(response.function_calls[0])
-    try:
-        if result.parts[0].function_response.response:
-            if sys.argv[2] == "--verbose":
-                print(f"-> {result.parts[0].function_response.response}")
-    except:
-        raise Exception(f'Error occured in function: {response.function_calls[0].name}')
+    # If a response is returned by the model
+    if response.candidates:
+        for candidate in response.candidates:
+            messages.append(candidate.content)  # Add every response to the message log for context
+
+    # Check for a verbose flag
+    if len(sys.argv) > 2:
+        if sys.argv[2] == "--verbose":  # If it's the verbose flag
+            print(f'User prompt: {user_prompt}')
+            print(f'Prompt tokens: {response.usage_metadata.prompt_token_count}')
+            print(f'Response tokens: {response.usage_metadata.candidates_token_count}')
+        
+
+    if response.function_calls:  # If the LLM wants to make any function calls
+        print(f"Calling function: {response.function_calls[0].name}({response.function_calls[0].args})")
+        result = call_function(response.function_calls[0])  # Call "call_function" to execute the function and get a response
+        try:
+            if result.parts[0].function_response.response:  # If the response returned okay
+                messages.append(result)  # Add the response to the messages log
+                if len(sys.argv) > 2:
+                    if sys.argv[2] == "--verbose":  # Check for the verbose flag
+                        print(f"-> {result.parts[0].function_response.response}")  # Display the results to user
+        except:
+            raise Exception(f'Error occured in function: {response.function_calls[0].name}')
+    else:  # No more functions called, model is finished
+        print(response.text)  # Display final response
+        break
 
